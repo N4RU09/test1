@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>좀비 스트라이크: 멸망한 지구의 파수꾼</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700&display=swap');
+
+        :root {
+            --blood-red: #ef4444;
+            --waste-gray: #111827;
+            --dust: #4b5563;
+            --easy-green: #22c55e;
+            --normal-blue: #3b82f6;
+            --hard-orange: #f59e0b;
+            --nightmare-purple: #a855f7;
+            --infinity-red: #dc2626;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #030712;
+            font-family: 'Noto Sans KR', sans-serif;
+            color: #f3f4f6;
+            user-select: none;
+        }
+
+        canvas { display: block; }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel {
+            background: linear-gradient(180deg, #111827 0%, #030712 100%);
+            border: 1px solid #374151;
+            padding: 2.5rem;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 700px;
+            width: 90%;
+            box-shadow: 0 0 50px rgba(0,0,0,0.9);
+        }
+
+        h1 {
+            font-family: 'Black Han Sans', sans-serif;
+            font-size: 3.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--blood-red);
+            text-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+        }
+
+        .diff-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin: 2rem 0;
+        }
+
+        .btn {
+            background: #1f2937;
+            color: #fff;
+            padding: 12px 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #374151;
+            text-transform: uppercase;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            filter: brightness(1.2);
+        }
+
+        .btn-easy { border-bottom: 4px solid var(--easy-green); }
+        .btn-normal { border-bottom: 4px solid var(--normal-blue); }
+        .btn-hard { border-bottom: 4px solid var(--hard-orange); }
+        .btn-nightmare { border-bottom: 4px solid var(--nightmare-purple); }
+        .btn-infinity { border-bottom: 4px solid var(--infinity-red); animation: pulse 1.5s infinite; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0px rgba(220, 38, 38, 0); }
+            50% { box-shadow: 0 0 15px rgba(220, 38, 38, 0.5); }
+            100% { box-shadow: 0 0 0px rgba(220, 38, 38, 0); }
+        }
+
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 30px;
+            display: none;
+            box-sizing: border-box;
+        }
+
+        .stat-bar {
+            width: 300px;
+            height: 14px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #4b5563;
+            margin-bottom: 6px;
+            overflow: hidden;
+        }
+
+        #hp-fill { width: 100%; height: 100%; background: #dc2626; transition: width 0.3s; }
+        #xp-fill { width: 0%; height: 100%; background: #15803d; transition: width 0.3s; }
+
+        .hud-top { display: flex; justify-content: space-between; align-items: flex-start; }
+
+        #weapon-list {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .weapon-tag {
+            background: rgba(17, 24, 39, 0.9);
+            padding: 6px 15px;
+            font-size: 0.8rem;
+            text-align: right;
+            border: 1px solid #374151;
+            border-right: 4px solid var(--blood-red);
+        }
+
+        #minimap {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 180px;
+            height: 180px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #4b5563;
+        }
+
+        .card-container { display: flex; gap: 15px; margin-top: 20px; justify-content: center; }
+        .card {
+            background: #111827;
+            border: 1px solid #374151;
+            padding: 20px;
+            width: 160px;
+            cursor: pointer;
+            transition: 0.2s;
+            pointer-events: auto;
+        }
+        .card:hover { border-color: var(--blood-red); background: #1f2937; }
+
+        .vignette {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            box-shadow: inset 0 0 300px rgba(0,0,0,1);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        #wave-goal {
+            font-size: 0.9rem;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+
+<div class="vignette"></div>
+
+<div id="ui-layer">
+    <div id="menu-screen" class="overlay">
+        <div class="panel">
+            <h1>ZOMBIE STRIKE</h1>
+            <p style="color: #9ca3af;">멸망한 지구의 파수꾼: 적들의 속도가 50% 둔화되었습니다.</p>
+            
+            <div class="diff-grid">
+                <button class="btn btn-easy" onclick="game.start(10, '쉬움')">쉬움<br><span class="text-xs">10 웨이브</span></button>
+                <button class="btn btn-normal" onclick="game.start(20, '노말')">노말<br><span class="text-xs">20 웨이브</span></button>
+                <button class="btn btn-hard" onclick="game.start(30, '어려움')">어려움<br><span class="text-xs">30 웨이브</span></button>
+                <button class="btn btn-nightmare" onclick="game.start(40, '악몽')">악몽<br><span class="text-xs">40 웨이브</span></button>
+                <button class="btn btn-infinity" onclick="game.start(9999, '끝이 없는')">끝이 없는<br><span class="text-xs">Endless</span></button>
+            </div>
+
+            <p style="font-size: 0.8rem; color: #4b5563;">WASD 이동 | 클릭 사격 | '끝이 없는'은 어려움 난이도 수준의 적이 등장합니다.</p>
+        </div>
+    </div>
+
+    <div id="hud">
+        <div class="hud-top">
+            <div>
+                <div class="stat-bar"><div id="hp-fill"></div></div>
+                <div style="font-size: 0.7rem; font-weight: bold; color: var(--blood-red);">코어 안정성</div>
+                <div class="stat-bar" style="margin-top: 15px;"><div id="xp-fill"></div></div>
+                <div style="font-size: 0.7rem; font-weight: bold; color: #4ade80;">레벨: <span id="lv-val">1</span></div>
+            </div>
+            <div style="text-align: right;">
+                <h2 id="wave-text" style="margin: 0; font-family: 'Black Han Sans'; font-size: 2.5rem;">DAY 1</h2>
+                <div id="wave-goal">목표: 10 웨이브</div>
+                <div id="wave-timer-container" style="font-size: 1.2rem; color: var(--blood-red); font-family: 'Black Han Sans';"><span id="wave-timer">10.0</span>s</div>
+            </div>
+        </div>
+        <canvas id="minimap"></canvas>
+        <div id="weapon-list"></div>
+    </div>
+
+    <div id="upgrade-screen" class="overlay" style="display: none;">
+        <div class="panel">
+            <h2 style="font-family: 'Black Han Sans'; font-size: 2rem; color: #fff;">시스템 강화</h2>
+            <div class="card-container" id="upgrade-options"></div>
+        </div>
+    </div>
+
+    <div id="message-screen" class="overlay" style="display: none;">
+        <div class="panel">
+            <h1 id="msg-title">기체 파손</h1>
+            <p id="msg-body">신호가 두절되었습니다.</p>
+            <button class="btn" onclick="location.reload()">재접속</button>
+        </div>
+    </div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const mCanvas = document.getElementById('minimap');
+const mctx = mCanvas.getContext('2d');
+
+const game = {
+    active: false,
+    width: window.innerWidth,
+    height: window.innerHeight,
+    worldSize: 4000,
+    
+    player: {
+        x: 2000, y: 2000, angle: 0, speed: 4.2,
+        hp: 100, maxHp: 100, xp: 0, maxXp: 100, lv: 1,
+        legPhase: 0, lastShoot: 0, magnet: 250, radius: 25,
+        weapons: [{ id: 'cannon', lv: 1, name: '기관포' }]
+    },
+
+    enemies: [], bullets: [], items: [], particles: [], cracks: [],
+    keys: {}, mouse: { x: 0, y: 0 },
+    wave: 1, maxWaves: 10, waveTimer: 10.0, lastFrame: 0,
+    difficulty: '노말',
+
+    init() {
+        canvas.width = this.width;
+        canvas.height = this.height;
+        mCanvas.width = 180;
+        mCanvas.height = 180;
+
+        window.addEventListener('resize', () => {
+            this.width = canvas.width = window.innerWidth;
+            this.height = canvas.height = window.innerHeight;
+        });
+        window.addEventListener('keydown', e => this.keys[e.code] = true);
+        window.addEventListener('keyup', e => this.keys[e.code] = false);
+        window.addEventListener('mousemove', e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
+        window.addEventListener('mousedown', () => { if(this.active) this.shoot(); });
+
+        for(let i=0; i<150; i++) {
+            this.cracks.push({
+                x: Math.random() * this.worldSize,
+                y: Math.random() * this.worldSize,
+                size: 40 + Math.random() * 100,
+                rot: Math.random() * Math.PI * 2
+            });
+        }
+    },
+
+    start(maxWaves, diff) {
+        this.maxWaves = maxWaves;
+        this.difficulty = diff;
+        this.active = true;
+        document.getElementById('menu-screen').style.display = 'none';
+        document.getElementById('hud').style.display = 'block';
+        
+        const goalText = diff === '끝이 없는' ? '목표: 영원히 생존하십시오' : `목표: ${maxWaves} 웨이브 클리어`;
+        document.getElementById('wave-goal').innerText = goalText;
+        this.lastFrame = performance.now();
+        this.loop();
+    },
+
+    update(dt) {
+        if(!this.active) return;
+
+        this.waveTimer -= dt;
+        if(this.waveTimer <= 0) {
+            this.wave++;
+            this.waveTimer = 10.0;
+            if(this.wave % 5 === 0) this.spawnBoss();
+            
+            if(this.difficulty !== '끝이 없는' && this.wave > this.maxWaves) {
+                this.win();
+            }
+        }
+
+        let spawnChance = 0.04 + (this.wave * 0.005);
+        if(this.difficulty === '악몽' || this.difficulty === '어려움' || this.difficulty === '끝이 없는') spawnChance += 0.02;
+
+        if(Math.random() < spawnChance) this.spawnEnemy();
+
+        let mx = 0, my = 0;
+        if(this.keys['KeyW']) my -= 1;
+        if(this.keys['KeyS']) my += 1;
+        if(this.keys['KeyA']) mx -= 1;
+        if(this.keys['KeyD']) mx += 1;
+
+        if(mx !== 0 || my !== 0) {
+            const mag = Math.sqrt(mx*mx + my*my);
+            this.player.x += (mx/mag) * this.player.speed;
+            this.player.y += (my/mag) * this.player.speed;
+            this.player.legPhase += 0.22;
+        }
+
+        this.player.x = Math.max(50, Math.min(this.worldSize - 50, this.player.x));
+        this.player.y = Math.max(50, Math.min(this.worldSize - 50, this.player.y));
+        this.player.angle = Math.atan2(this.mouse.y - this.height/2, this.mouse.x - this.width/2);
+
+        for(let i=this.enemies.length-1; i>=0; i--) {
+            const e = this.enemies[i];
+            const ang = Math.atan2(this.player.y - e.y, this.player.x - e.x);
+            e.x += Math.cos(ang) * e.speed;
+            e.y += Math.sin(ang) * e.speed;
+
+            if(this.dist(this.player, e) < (e.radius + this.player.radius)) {
+                this.player.hp -= (e.boss ? 1.0 : 0.4);
+                if(this.player.hp <= 0) this.gameOver();
+            }
+
+            if(e.hp <= 0) {
+                this.dropItem(e.x, e.y, e.boss ? 'box' : 'xp', e.boss ? 1 : (15 + this.wave));
+                this.enemies.splice(i, 1);
+            }
+        }
+
+        for(let i=this.bullets.length-1; i>=0; i--) {
+            const b = this.bullets[i];
+            b.x += Math.cos(b.angle) * b.speed;
+            b.y += Math.sin(b.angle) * b.speed;
+            b.life--;
+
+            for(let e of this.enemies) {
+                if(this.dist(b, e) < e.radius) {
+                    e.hp -= b.dmg;
+                    b.life = 0;
+                    break;
+                }
+            }
+            if(b.life <= 0) this.bullets.splice(i, 1);
+        }
+
+        for(let i=this.items.length-1; i>=0; i--) {
+            const it = this.items[i];
+            const d = this.dist(this.player, it);
+            if(d < this.player.magnet) {
+                const ang = Math.atan2(this.player.y - it.y, this.player.x - it.x);
+                it.x += Math.cos(ang) * 14;
+                it.y += Math.sin(ang) * 14;
+                if(d < 35) {
+                    if(it.type === 'xp') this.gainXP(it.val);
+                    else this.showUpgrade();
+                    this.items.splice(i, 1);
+                }
+            }
+        }
+
+        this.updateHUD();
+    },
+
+    draw() {
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, this.width, this.height);
+
+        ctx.save();
+        ctx.translate(this.width/2 - this.player.x, this.height/2 - this.player.y);
+
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 2;
+        this.cracks.forEach(c => {
+            ctx.beginPath();
+            ctx.moveTo(c.x, c.y);
+            ctx.lineTo(c.x + Math.cos(c.rot)*c.size, c.y + Math.sin(c.rot)*c.size);
+            ctx.stroke();
+        });
+
+        this.enemies.forEach(e => {
+            ctx.fillStyle = e.boss ? '#7e22ce' : '#374151';
+            ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+            if(e.boss) {
+                ctx.fillStyle = '#000'; ctx.fillRect(e.x-40, e.y-70, 80, 5);
+                ctx.fillStyle = '#f00'; ctx.fillRect(e.x-40, e.y-70, (e.hp/e.maxHp)*80, 5);
+            }
+        });
+
+        this.items.forEach(it => {
+            ctx.fillStyle = it.type === 'xp' ? '#22c55e' : '#fbbf24';
+            ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle;
+            ctx.beginPath(); ctx.arc(it.x, it.y, 6, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+        });
+
+        this.bullets.forEach(b => {
+            ctx.fillStyle = '#fde047';
+            ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI*2); ctx.fill();
+        });
+
+        this.drawPlayer();
+        ctx.restore();
+        this.drawMinimap();
+    },
+
+    drawPlayer() {
+        const p = this.player;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+
+        for(let i=0; i<6; i++) {
+            const baseAng = (i / 6) * Math.PI * 2;
+            const phase = Math.sin(p.legPhase + i * 1.2) * 15;
+            ctx.save();
+            ctx.rotate(baseAng);
+            ctx.strokeStyle = '#020617';
+            ctx.lineWidth = 10;
+            ctx.beginPath();
+            ctx.moveTo(10, 0);
+            ctx.lineTo(35 + phase, phase/2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        ctx.rotate(p.angle);
+        ctx.fillStyle = '#020617';
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-22, -18); ctx.lineTo(28, -12); ctx.lineTo(28, 12); ctx.lineTo(-22, 18); ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        
+        ctx.fillStyle = '#ef4444';
+        ctx.shadowBlur = 15; ctx.shadowColor = '#ef4444';
+        ctx.beginPath(); ctx.arc(18, 0, 5, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.restore();
+    },
+
+    drawMinimap() {
+        mctx.fillStyle = 'rgba(0,0,0,0.8)';
+        mctx.fillRect(0, 0, 180, 180);
+        const s = 180 / this.worldSize;
+        mctx.fillStyle = '#22c55e';
+        mctx.beginPath(); mctx.arc(this.player.x * s, this.player.y * s, 4, 0, Math.PI*2); mctx.fill();
+        mctx.fillStyle = '#ef4444';
+        this.enemies.forEach(e => {
+            mctx.beginPath(); mctx.arc(e.x * s, e.y * s, 2, 0, Math.PI*2); mctx.fill();
+        });
+    },
+
+    shoot() {
+        const now = performance.now();
+        if(now - this.player.lastShoot < 140) return;
+        this.player.lastShoot = now;
+        this.bullets.push({
+            x: this.player.x, y: this.player.y, angle: this.player.angle,
+            speed: 16, dmg: 18 + (this.player.lv * 2), life: 65
+        });
+    },
+
+    spawnEnemy() {
+        const ang = Math.random() * Math.PI * 2;
+        const x = this.player.x + Math.cos(ang) * 900;
+        const y = this.player.y + Math.sin(ang) * 900;
+        
+        let baseSpeed = 0.6 + Math.random() * 0.4;
+        let hp = 40 + (this.wave * 12);
+
+        if(this.difficulty === '어려움' || this.difficulty === '끝이 없는' || this.difficulty === '악몽') {
+            hp *= 1.5;
+            baseSpeed *= 1.2;
+        }
+
+        this.enemies.push({
+            x, y, hp: hp, speed: baseSpeed, radius: 22, boss: false
+        });
+    },
+
+    spawnBoss() {
+        const ang = Math.random() * Math.PI * 2;
+        const hp = 600 + (this.wave * 150);
+        this.enemies.push({
+            x: this.player.x + Math.cos(ang)*850,
+            y: this.player.y + Math.sin(ang)*850,
+            hp: hp, maxHp: hp,
+            speed: 0.5, radius: 55, boss: true
+        });
+    },
+
+    dropItem(x, y, type, val) { this.items.push({ x, y, type, val }); },
+
+    gainXP(val) {
+        this.player.xp += val;
+        if(this.player.xp >= this.player.maxXp) {
+            this.player.xp -= this.player.maxXp;
+            this.player.lv++;
+            this.player.maxXp *= 1.25;
+            this.showUpgrade();
+        }
+    },
+
+    showUpgrade() {
+        this.active = false;
+        const screen = document.getElementById('upgrade-screen');
+        const container = document.getElementById('upgrade-options');
+        screen.style.display = 'flex';
+        container.innerHTML = '';
+        
+        const options = [
+            { n: '화력 강화', f: () => { } },
+            { n: '엔진 과부하', f: () => this.player.speed *= 1.12 },
+            { n: '장갑 수리', f: () => this.player.hp = Math.min(this.player.maxHp, this.player.hp + 40) },
+            { n: '자력 코일', f: () => this.player.magnet += 80 }
+        ].sort(() => 0.5 - Math.random()).slice(0, 3);
+
+        options.forEach(opt => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `<h3>${opt.n}</h3><p class="text-xs text-gray-500 mt-2">시스템 효율 개선</p>`;
+            card.onclick = () => {
+                opt.f();
+                screen.style.display = 'none';
+                this.active = true;
+                this.lastFrame = performance.now();
+                this.loop();
+            };
+            container.appendChild(card);
+        });
+    },
+
+    updateHUD() {
+        document.getElementById('hp-fill').style.width = this.player.hp + '%';
+        document.getElementById('xp-fill').style.width = (this.player.xp / this.player.maxXp * 100) + '%';
+        document.getElementById('lv-val').innerText = this.player.lv;
+        document.getElementById('wave-text').innerText = `DAY ${this.wave}`;
+        document.getElementById('wave-timer').innerText = Math.max(0, this.waveTimer).toFixed(1);
+    },
+
+    dist(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2); },
+
+    gameOver() { 
+        this.active = false; 
+        document.getElementById('msg-title').innerText = "기체 파손";
+        document.getElementById('msg-body').innerText = `${this.wave}일 동안 생존했습니다.`;
+        document.getElementById('message-screen').style.display = 'flex'; 
+    },
+    
+    win() { 
+        this.active = false; 
+        document.getElementById('msg-title').innerText = "임무 성공";
+        document.getElementById('msg-body').innerText = `'${this.difficulty}' 난이도를 정복했습니다!`;
+        document.getElementById('message-screen').style.display = 'flex'; 
+    },
+
+    loop() {
+        if(!this.active) return;
+        const now = performance.now();
+        const dt = (now - this.lastFrame) / 1000;
+        this.lastFrame = now;
+        this.update(dt);
+        this.draw();
+        requestAnimationFrame(() => this.loop());
+    }
+};
+
+window.onload = () => game.init();
+</script>
+</body>
+</html>
